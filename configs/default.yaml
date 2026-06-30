@@ -1,5 +1,5 @@
 project: # 项目信息
-  name: "A股ETF动量策略-159801" # 报告标题
+  name: "A股ETF动量策略-沪深300短周期" # 报告标题
 
 data: # 数据配置
   source: "tencent" # 行情源：腾讯 ETF 前复权接口
@@ -12,8 +12,8 @@ data: # 数据配置
   fetch_date_format: "%Y%m%d" # 缓存拉取日期格式
 
 universe: # ETF 标的池
-  - symbol: "159801" # ETF 代码
-    name: "芯片ETF" # ETF 名称
+  - symbol: "510300" # ETF 代码
+    name: "沪深300ETF" # ETF 名称
 
 backtest: # 回测区间与资金
   start_date: "2015-01-01" # 回测开始日期
@@ -27,49 +27,49 @@ execution: # 成交与成本
 
 position: # 仓位管理
   max_positions: 1 # 最多同时持有 ETF 数
-  intent_position_pct: 0.30 # 单 ETF 意向仓位
+  intent_position_pct: 0.90 # 单 ETF 意向仓位
   pyramid: # 金字塔加仓配置
     enabled: true # 是否启用分段加仓
     steps: # 加仓阶梯列表
       - trigger_pct: 0.00 # 首仓触发涨幅
-        allocation_pct: 0.50 # 首仓占意向仓位比例
-      - trigger_pct: 0.10 # 第二段触发涨幅
-        allocation_pct: 0.30 # 第二段占意向仓位比例
-      - trigger_pct: 0.20 # 第三段触发涨幅
-        allocation_pct: 0.20 # 第三段占意向仓位比例
+        allocation_pct: 0.60 # 首仓占意向仓位比例
+      - trigger_pct: 0.03 # 第二段触发涨幅
+        allocation_pct: 0.25 # 第二段占意向仓位比例
+      - trigger_pct: 0.06 # 第三段触发涨幅
+        allocation_pct: 0.15 # 第三段占意向仓位比例
 
 strategy: # 策略信号配置
   entry: # 入场信号组
     mode: "all" # 组合方式：all 全满足
     conditions: # 入场条件列表
       - type: "breakout" # 条件类型：价格突破
-        name: "close_break_120_high" # 条件名称
+        name: "close_break_20_high" # 条件名称
         field: "close" # 用收盘价比较
         op: ">" # 比较符号
         breakout_field: "high" # 回看最高价字段
-        window: 120 # 回看交易日数量
+        window: 20 # 回看交易日数量
         shift: 1 # 向前错位避免未来函数
       - type: "ma_relation" # 条件类型：均线关系
-        name: "ma60_above_ma250" # 条件名称
+        name: "ma10_above_ma30" # 条件名称
         field: "close" # 均线计算字段
         op: ">" # 比较符号
-        fast_window: 60 # 快均线窗口
-        slow_window: 250 # 慢均线窗口
+        fast_window: 10 # 快均线窗口
+        slow_window: 30 # 慢均线窗口
         ma_method: "sma" # 均线算法：sma 或 ema
   exit: # 出场信号组
     mode: "any" # 组合方式：any 任一满足
     conditions: # 出场条件列表
       - type: "ma_break" # 条件类型：跌破均线
-        name: "close_below_ma60_before_full" # 条件名称
+        name: "close_below_ma20_before_full" # 条件名称
         apply: "before_pyramid_complete" # 加仓完成前生效
         field: "close" # 用收盘价比较
         op: "<" # 比较符号
-        ma_window: 60 # 均线窗口
+        ma_window: 20 # 均线窗口
         ma_method: "sma" # 均线算法：sma 或 ema
       - type: "trailing_stop" # 条件类型：移动止损
-        name: "drawdown_15_after_full" # 条件名称
+        name: "drawdown_8_after_full" # 条件名称
         apply: "after_pyramid_complete" # 加仓完成后生效
-        drawdown_pct: 0.15 # 持仓高点回撤比例
+        drawdown_pct: 0.08 # 持仓高点回撤比例
 
 report: # 报告输出配置
   output_dir: "outputs" # 报告输出目录
