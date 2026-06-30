@@ -44,27 +44,57 @@ def make_momentum_strategy():
             self.order_records = []
             self.closed_trade_records = []
 
+        def prenext_open(self) -> None:
+            self.next_open()
+
+        def nextstart_open(self) -> None:
+            self.next_open()
+
         def next_open(self) -> None:
             # 成交时点风险点：启用 backtrader cheat_on_open 后，next_open 在 T+1 开盘前触发；
             # 此处只读取 [-1] 的 T 日收盘信号并用 [0] 的 T+1 开盘价下单。
             for data in self.datas:
-                if len(data) < 2:
+                if not self._can_trade_current_bar(data):
                     continue
                 self._maybe_exit(data)
 
             entry_slots = self.config.backtest.max_positions - self._open_position_count()
             for data in self.datas:
-                if len(data) < 2:
+                if not self._can_trade_current_bar(data):
                     continue
                 submitted_new_entry = self._maybe_enter_or_add(data, entry_slots)
                 if submitted_new_entry and not self.getposition(data).size:
                     # 同日多个 ETF 入场信号按配置顺序优先，提交首仓订单后即占用一个名额。
                     entry_slots -= 1
 
+        def prenext(self) -> None:
+            self.next()
+
+        def nextstart(self) -> None:
+            self.next()
+
         def next(self) -> None:
             for data, state in self.position_states.items():
-                if self.getposition(data).size:
+                if self.getposition(data).size and self._is_current_bar(data):
                     state.update_peak(float(data.close[0]))
+
+        def _can_trade_current_bar(self, data) -> bool:
+            # ETF 上市日期/停牌处理风险点：多标的回测中，backtrader 在所有数据都
+            # 就绪前会进入 prenext_open。这里允许已上市且有足够历史的 ETF 交易，
+            # 但只处理当前日期同步的数据，避免未上市或停牌数据沿用旧 bar。
+            return len(data) >= 2 and self._is_current_bar(data)
+
+        def _is_current_bar(self, data) -> bool:
+            current_date = self._current_data_date()
+            return (
+                current_date is not None
+                and len(data) > 0
+                and data.datetime.date(0) == current_date
+            )
+
+        def _current_data_date(self):
+            dates = [data.datetime.date(0) for data in self.datas if len(data) > 0]
+            return max(dates) if dates else None
 
         def _maybe_exit(self, data) -> None:
             position = self.getposition(data)
