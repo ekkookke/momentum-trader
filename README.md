@@ -44,6 +44,14 @@ uv sync
 uv run momentum-trader run --config configs/default.yaml
 ```
 
+如果当前网络代理阻断 EastMoney 前复权接口，可以先用新浪日线演示配置验证管线：
+
+```bash
+uv run momentum-trader run --config configs/sina_demo.yaml
+```
+
+注意：`configs/sina_demo.yaml` 使用新浪 ETF 日线接口，不提供前复权参数，只适合验证工程流程和查看输出形态，不能替代正式前复权回测结论。
+
 分步运行：
 
 ```bash
@@ -57,6 +65,17 @@ uv run momentum-trader report --config configs/default.yaml
 ```bash
 uv run pytest
 ```
+
+## 输出产物
+
+默认输出目录为 `outputs/`，新浪演示配置输出到 `outputs/sina_demo/`：
+
+- `charts/equity_vs_hs300.png`：策略累计净值 vs 沪深 300 基准图
+- `reports/equity_curve.csv`：每日账户权益曲线
+- `reports/metrics.csv`：年化收益、夏普、最大回撤、卡玛、胜率等指标
+- `reports/symbol_pnl.csv`：按 ETF 汇总的已闭合交易盈亏
+- `trades/orders.csv`：逐笔订单成交明细
+- `trades/closed_trades.csv`：已闭合交易明细
 
 ## 当前策略规则
 
@@ -75,4 +94,3 @@ uv run pytest
 - 涨跌停：`open_limit_up` 在执行日根据 T+1 开盘价和前收盘价标记；若 T+1 一字涨停，买入和加仓跳过。
 - 停牌处理：不补齐缺失交易日，停牌日不会生成或执行交易。
 - ETF 上市日期：数据从 AkShare 返回的首个有效交易日开始，早于上市日的回测起点自动失效。
-

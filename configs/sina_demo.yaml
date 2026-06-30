@@ -1,11 +1,13 @@
 project:
-  name: "A股ETF动量策略"
+  name: "A股ETF动量策略-新浪演示数据"
 
 data:
-  source: "eastmoney"
+  # 演示数据源：用于在 EastMoney 前复权接口被网络代理阻断时验证回测管线。
+  # 注意：新浪 ETF 日线接口不提供 qfq 前复权参数，不能替代正式回测结论。
+  source: "sina"
   raw_dir: "data/raw"
   processed_dir: "data/processed"
-  adjust: "qfq"
+  adjust: "none"
   etf_period: "daily"
   benchmark_symbol: "sh000300"
   benchmark_name: "沪深300指数"
@@ -49,7 +51,7 @@ strategy:
       allocation_pct: 0.20
 
 report:
-  output_dir: "outputs"
+  output_dir: "outputs/sina_demo"
   risk_free_rate: 0.0
   trading_days_per_year: 252
   font_candidates:

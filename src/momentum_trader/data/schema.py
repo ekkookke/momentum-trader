@@ -4,7 +4,8 @@ from collections.abc import Iterable
 
 import pandas as pd
 
-STANDARD_COLUMNS = ["date", "open", "high", "low", "close", "volume", "amount"]
+REQUIRED_COLUMNS = ["date", "open", "high", "low", "close", "volume"]
+STANDARD_COLUMNS = [*REQUIRED_COLUMNS, "amount"]
 
 AKSHARE_COLUMN_MAP = {
     "日期": "date",
@@ -23,9 +24,11 @@ AKSHARE_COLUMN_MAP = {
 
 def normalize_ohlcv(raw: pd.DataFrame) -> pd.DataFrame:
     df = raw.rename(columns=AKSHARE_COLUMN_MAP).copy()
-    missing = [column for column in STANDARD_COLUMNS if column not in df.columns]
+    missing = [column for column in REQUIRED_COLUMNS if column not in df.columns]
     if missing:
         raise ValueError(f"missing required OHLCV columns: {missing}")
+    if "amount" not in df.columns:
+        df["amount"] = pd.NA
 
     df["date"] = pd.to_datetime(df["date"]).dt.normalize()
     numeric_columns = [column for column in df.columns if column != "date"]
@@ -40,4 +43,3 @@ def assert_columns(df: pd.DataFrame, columns: Iterable[str]) -> None:
     missing = [column for column in columns if column not in df.columns]
     if missing:
         raise ValueError(f"dataframe missing columns: {missing}")
-
