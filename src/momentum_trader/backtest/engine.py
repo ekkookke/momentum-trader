@@ -31,7 +31,7 @@ def run_backtest(
 
     cerebro = bt.Cerebro(cheat_on_open=True)
     cerebro.broker.setcash(config.backtest.initial_cash)
-    cerebro.broker.addcommissioninfo(make_percent_commission_info(config.backtest.commission_rate))
+    cerebro.broker.addcommissioninfo(make_percent_commission_info(config.execution.commission_rate))
 
     data_cls = make_etf_pandas_data()
     for etf in config.universe:
@@ -39,7 +39,7 @@ def run_backtest(
         prepared = prepare_strategy_frame(
             raw,
             strategy=config.strategy,
-            limit_up_threshold=config.backtest.limit_up_threshold,
+            limit_up_threshold=config.execution.limit_up_threshold,
         )
         feed_df = prepared.set_index("date")
         cerebro.adddata(data_cls(dataname=feed_df, name=etf.symbol))
@@ -70,4 +70,3 @@ def save_backtest_result(result: BacktestResult, output_dir: Path) -> None:
     result.equity_curve.to_csv(reports_dir / "equity_curve.csv", index=False)
     result.orders.to_csv(trades_dir / "orders.csv", index=False)
     result.closed_trades.to_csv(trades_dir / "closed_trades.csv", index=False)
-

@@ -85,13 +85,33 @@ uv run momentum-trader serve-report --config configs/default.yaml --port 8765
 
 ## 当前策略规则
 
-- 标的池：沪深 300 ETF、中证 500 ETF、半导体 ETF、创新药 ETF、光伏 ETF、恒生科技 ETF
+- 默认标的：芯片 ETF（159801）
 - 入场：收盘价突破过去 120 个交易日最高价，且 60 日均线大于 250 日均线
 - 金字塔加仓：首仓 50%，上涨 10% 加 30%，上涨 20% 加 20%
 - 止损：加仓阶段跌破 60 日均线清仓；加仓完成后，从持仓期间最高价回撤 15% 清仓
-- 仓位：单 ETF 意向仓位为总资金 30%，最多同时持有 2 只 ETF
+- 仓位：单 ETF 意向仓位为总资金 30%，默认只跟踪 159801，所以最多同时持有 1 只 ETF
 - 交易：T 日收盘后生成信号，T+1 日开盘成交
 - 成本：单边 0.15%
+
+## 配置化策略
+
+主要改 `configs/default.yaml` 即可快速实验：
+
+- `universe`：调整跟踪的 ETF 代码和名称。
+- `backtest`：调整回测起止日期、初始资金和现金利率。
+- `execution`：调整单边成本和一字涨停判定阈值。
+- `position`：调整最大持仓数、单 ETF 意向仓位和金字塔加仓阶梯；`pyramid.enabled: false` 时首仓直接打满意向仓位。
+- `strategy.entry.conditions`：调整入场条件，`mode: all` 表示全部满足，`mode: any` 表示任一满足。
+- `strategy.exit.conditions`：调整出场条件，`apply` 可设为 `before_pyramid_complete`、`after_pyramid_complete` 或 `always`。
+
+当前支持的条件类型：
+
+- `breakout`：价格突破过去 N 日某个价格字段的滚动高点，通常配 `shift: 1` 避免未来函数。
+- `ma_relation`：快均线与慢均线比较，例如 60 日均线大于 250 日均线。
+- `price_vs_ma` / `ma_break`：价格与某条均线比较，可用于入场过滤或跌破均线出场。
+- `roc`：N 日涨跌幅与阈值比较。
+- `rolling_mean_threshold`：某字段 N 日均值与阈值比较。
+- `trailing_stop`：持仓高点回撤止损，这是持仓状态相关条件，只在回测执行层动态判断。
 
 ## 回测风险点处理
 

@@ -2,35 +2,140 @@ from __future__ import annotations
 
 import pandas as pd
 
-from momentum_trader.config import StrategyConfig
+from momentum_trader.config import ConditionConfig, SignalGroupConfig, StrategyConfig
 from momentum_trader.data.schema import assert_columns
 
 
 def add_momentum_signals(df: pd.DataFrame, strategy: StrategyConfig) -> pd.DataFrame:
     assert_columns(df, ["date", "open", "high", "low", "close"])
     result = df.copy()
+    for diagnostic_column in ["breakout_high", "ma_short", "ma_long"]:
+        result[diagnostic_column] = float("nan")
+    result["entry_signal"] = _combine_conditions(
+        result,
+        strategy.entry,
+        prefix="entry",
+    )
+    result["exit_signal_before_pyramid"] = _combine_exit_conditions(
+        result,
+        strategy.exit,
+        apply_scope="before_pyramid_complete",
+        prefix="exit_before",
+    )
+    result["exit_signal_after_pyramid"] = _combine_exit_conditions(
+        result,
+        strategy.exit,
+        apply_scope="after_pyramid_complete",
+        prefix="exit_after",
+    )
+    return result
 
-    # 未来函数风险点：突破高点使用 shift(1)，即 T 日收盘价只和 T-1 及以前的
-    # 120 个交易日最高价比较；当前 K 线最高价不会进入突破阈值。
-    result["breakout_high"] = (
-        result["high"]
-        .shift(1)
-        .rolling(strategy.breakout_window, min_periods=strategy.breakout_window)
+
+def _combine_exit_conditions(
+    df: pd.DataFrame,
+    group: SignalGroupConfig,
+    apply_scope: str,
+    prefix: str,
+) -> pd.Series:
+    scoped = [
+        condition
+        for condition in group.conditions
+        if condition.type != "trailing_stop" and condition.apply in {"always", apply_scope}
+    ]
+    return _combine_conditions(df, SignalGroupConfig(mode=group.mode, conditions=scoped), prefix)
+
+
+def _combine_conditions(df: pd.DataFrame, group: SignalGroupConfig, prefix: str) -> pd.Series:
+    if not group.conditions:
+        return pd.Series(False, index=df.index)
+
+    signals = []
+    for idx, condition in enumerate(group.conditions):
+        if condition.type == "trailing_stop":
+            continue
+        signal = _evaluate_condition(df, condition)
+        signals.append(signal)
+        df[_condition_column(prefix, condition, idx)] = signal.fillna(False).astype(bool)
+
+    if not signals:
+        return pd.Series(False, index=df.index)
+
+    combined = signals[0]
+    for signal in signals[1:]:
+        if group.mode == "all":
+            combined = combined & signal
+        else:
+            combined = combined | signal
+    return combined.fillna(False).astype(bool)
+
+
+def _evaluate_condition(df: pd.DataFrame, condition: ConditionConfig) -> pd.Series:
+    if condition.type == "breakout":
+        return _breakout_signal(df, condition)
+    if condition.type == "ma_relation":
+        return _ma_relation_signal(df, condition)
+    if condition.type in {"price_vs_ma", "ma_break"}:
+        ma = _moving_average(df[condition.field], condition.ma_window, condition.ma_method)
+        return _compare(df[condition.field], condition.op, ma)
+    if condition.type == "roc":
+        roc = df[condition.field].pct_change(condition.window)
+        return _compare(roc, condition.op, condition.threshold)
+    if condition.type == "rolling_mean_threshold":
+        rolling_mean = df[condition.field].rolling(
+            condition.window,
+            min_periods=condition.window,
+        ).mean()
+        return _compare(rolling_mean, condition.op, condition.threshold)
+    raise ValueError(f"unsupported condition type: {condition.type}")
+
+
+def _breakout_signal(df: pd.DataFrame, condition: ConditionConfig) -> pd.Series:
+    # 未来函数风险点：突破阈值默认使用 shift=1，T 日收盘只比较 T-1 及以前的高点。
+    breakout_high = (
+        df[condition.breakout_field]
+        .shift(condition.shift)
+        .rolling(condition.window, min_periods=condition.window)
         .max()
     )
+    df["breakout_high"] = breakout_high
+    return _compare(df[condition.field], condition.op, breakout_high)
 
-    # 未来函数风险点：均线在 T 日收盘后计算，允许使用 T 日收盘价，但不会使用 T+1 数据。
-    result["ma_short"] = result["close"].rolling(
-        strategy.short_ma_window, min_periods=strategy.short_ma_window
-    ).mean()
-    result["ma_long"] = result["close"].rolling(
-        strategy.long_ma_window, min_periods=strategy.long_ma_window
-    ).mean()
-    result["entry_signal"] = (
-        (result["close"] > result["breakout_high"]) & (result["ma_short"] > result["ma_long"])
-    )
-    result["entry_signal"] = result["entry_signal"].fillna(False).astype(bool)
-    return result
+
+def _ma_relation_signal(df: pd.DataFrame, condition: ConditionConfig) -> pd.Series:
+    fast = _moving_average(df[condition.field], condition.fast_window, condition.ma_method)
+    slow = _moving_average(df[condition.field], condition.slow_window, condition.ma_method)
+    df["ma_short"] = fast
+    df["ma_long"] = slow
+    return _compare(fast, condition.op, slow)
+
+
+def _moving_average(series: pd.Series, window: int | None, method: str) -> pd.Series:
+    if window is None:
+        raise ValueError("moving average window is required")
+    if method == "ema":
+        return series.ewm(span=window, min_periods=window, adjust=False).mean()
+    return series.rolling(window, min_periods=window).mean()
+
+
+def _compare(left, op: str, right) -> pd.Series:
+    if op == ">":
+        return left > right
+    if op == ">=":
+        return left >= right
+    if op == "<":
+        return left < right
+    if op == "<=":
+        return left <= right
+    if op == "==":
+        return left == right
+    if op == "!=":
+        return left != right
+    raise ValueError(f"unsupported comparison operator: {op}")
+
+
+def _condition_column(prefix: str, condition: ConditionConfig, idx: int) -> str:
+    name = condition.name or f"{condition.type}_{idx}"
+    return f"{prefix}_{name}"
 
 
 def add_execution_flags(df: pd.DataFrame, limit_up_threshold: float) -> pd.DataFrame:

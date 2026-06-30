@@ -2,21 +2,53 @@ from __future__ import annotations
 
 import pandas as pd
 
-from momentum_trader.config import PyramidStepConfig, StrategyConfig
+from momentum_trader.config import ConditionConfig, SignalGroupConfig, StrategyConfig
 from momentum_trader.strategy.signals import add_execution_flags, add_momentum_signals
 
 
 def make_strategy_config() -> StrategyConfig:
     return StrategyConfig(
-        breakout_window=120,
-        short_ma_window=60,
-        long_ma_window=250,
-        trailing_stop_pct=0.15,
-        pyramid=[
-            PyramidStepConfig(trigger_pct=0.0, allocation_pct=0.5),
-            PyramidStepConfig(trigger_pct=0.1, allocation_pct=0.3),
-            PyramidStepConfig(trigger_pct=0.2, allocation_pct=0.2),
-        ],
+        entry=SignalGroupConfig(
+            mode="all",
+            conditions=[
+                ConditionConfig(
+                    type="breakout",
+                    name="close_break_120_high",
+                    field="close",
+                    op=">",
+                    breakout_field="high",
+                    window=120,
+                    shift=1,
+                ),
+                ConditionConfig(
+                    type="ma_relation",
+                    name="ma60_above_ma250",
+                    field="close",
+                    op=">",
+                    fast_window=60,
+                    slow_window=250,
+                ),
+            ],
+        ),
+        exit=SignalGroupConfig(
+            mode="any",
+            conditions=[
+                ConditionConfig(
+                    type="ma_break",
+                    name="close_below_ma60_before_full",
+                    apply="before_pyramid_complete",
+                    field="close",
+                    op="<",
+                    ma_window=60,
+                ),
+                ConditionConfig(
+                    type="trailing_stop",
+                    name="drawdown_15_after_full",
+                    apply="after_pyramid_complete",
+                    drawdown_pct=0.15,
+                ),
+            ],
+        ),
     )
 
 
@@ -68,6 +100,18 @@ def test_entry_signal_false_before_long_ma_warmup() -> None:
 
     assert bool(result["ma_long"].isna().all())
     assert not result["entry_signal"].any()
+
+
+def test_exit_signal_uses_configured_pre_pyramid_ma_break() -> None:
+    df = base_frame()
+    df.loc[df.index[-1], "close"] = 80.0
+    df.loc[df.index[-1], "open"] = 80.0
+    df.loc[df.index[-1], "low"] = 79.0
+
+    result = add_momentum_signals(df, make_strategy_config())
+
+    assert bool(result.loc[result.index[-1], "exit_signal_before_pyramid"]) is True
+    assert bool(result.loc[result.index[-1], "exit_signal_after_pyramid"]) is False
 
 
 def test_open_limit_up_flag_marks_one_price_limit_open() -> None:

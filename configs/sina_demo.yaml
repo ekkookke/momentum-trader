@@ -1,60 +1,91 @@
-project:
-  name: "A股ETF动量策略-新浪演示数据"
+project: # 项目信息
+  name: "A股ETF动量策略-新浪演示数据" # 报告标题
 
-data:
-  # 演示数据源：用于在 EastMoney 前复权接口被网络代理阻断时验证回测管线。
-  # 注意：新浪 ETF 日线接口不提供 qfq 前复权参数，不能替代正式回测结论。
-  source: "sina"
-  raw_dir: "data/raw"
-  processed_dir: "data/processed"
-  adjust: "none"
-  etf_period: "daily"
-  benchmark_symbol: "sh000300"
-  benchmark_name: "沪深300指数"
-  fetch_date_format: "%Y%m%d"
+data: # 数据配置
+  source: "sina" # 行情源：新浪演示接口
+  raw_dir: "data/raw" # 原始行情缓存目录
+  processed_dir: "data/processed" # 清洗数据预留目录
+  adjust: "none" # 新浪接口不提供前复权
+  etf_period: "daily" # ETF K 线周期
+  benchmark_symbol: "sh000300" # 基准指数代码
+  benchmark_name: "沪深300指数" # 基准显示名称
+  fetch_date_format: "%Y%m%d" # 缓存拉取日期格式
 
-universe:
-  - symbol: "510300"
-    name: "沪深300ETF"
-  - symbol: "510500"
-    name: "中证500ETF"
-  - symbol: "512480"
-    name: "半导体ETF"
-  - symbol: "159992"
-    name: "创新药ETF"
-  - symbol: "515790"
-    name: "光伏ETF"
-  - symbol: "513130"
-    name: "恒生科技ETF"
+universe: # ETF 标的池
+  - symbol: "510300" # ETF 代码
+    name: "沪深300ETF" # ETF 名称
+  - symbol: "510500" # ETF 代码
+    name: "中证500ETF" # ETF 名称
+  - symbol: "512480" # ETF 代码
+    name: "半导体ETF" # ETF 名称
+  - symbol: "159992" # ETF 代码
+    name: "创新药ETF" # ETF 名称
+  - symbol: "515790" # ETF 代码
+    name: "光伏ETF" # ETF 名称
+  - symbol: "513130" # ETF 代码
+    name: "恒生科技ETF" # ETF 名称
 
-backtest:
-  start_date: "2015-01-01"
-  end_date: "2024-12-31"
-  initial_cash: 1000000
-  commission_rate: 0.0015
-  max_positions: 2
-  intent_position_pct: 0.30
-  cash_interest_rate: 0.0
-  limit_up_threshold: 0.095
+backtest: # 回测区间与资金
+  start_date: "2015-01-01" # 回测开始日期
+  end_date: "2024-12-31" # 回测结束日期
+  initial_cash: 1000000 # 初始资金
+  cash_interest_rate: 0.0 # 现金年化利率
 
-strategy:
-  breakout_window: 120
-  short_ma_window: 60
-  long_ma_window: 250
-  trailing_stop_pct: 0.15
-  pyramid:
-    - trigger_pct: 0.00
-      allocation_pct: 0.50
-    - trigger_pct: 0.10
-      allocation_pct: 0.30
-    - trigger_pct: 0.20
-      allocation_pct: 0.20
+execution: # 成交与成本
+  commission_rate: 0.0015 # 单边综合成本
+  limit_up_threshold: 0.095 # 一字涨停判定阈值
 
-report:
-  output_dir: "outputs/sina_demo"
-  risk_free_rate: 0.0
-  trading_days_per_year: 252
-  font_candidates:
-    - "PingFang SC"
-    - "Arial Unicode MS"
-    - "SimHei"
+position: # 仓位管理
+  max_positions: 2 # 最多同时持有 ETF 数
+  intent_position_pct: 0.30 # 单 ETF 意向仓位
+  pyramid: # 金字塔加仓配置
+    enabled: true # 是否启用分段加仓
+    steps: # 加仓阶梯列表
+      - trigger_pct: 0.00 # 首仓触发涨幅
+        allocation_pct: 0.50 # 首仓占意向仓位比例
+      - trigger_pct: 0.10 # 第二段触发涨幅
+        allocation_pct: 0.30 # 第二段占意向仓位比例
+      - trigger_pct: 0.20 # 第三段触发涨幅
+        allocation_pct: 0.20 # 第三段占意向仓位比例
+
+strategy: # 策略信号配置
+  entry: # 入场信号组
+    mode: "all" # 组合方式：all 全满足
+    conditions: # 入场条件列表
+      - type: "breakout" # 条件类型：价格突破
+        name: "close_break_120_high" # 条件名称
+        field: "close" # 用收盘价比较
+        op: ">" # 比较符号
+        breakout_field: "high" # 回看最高价字段
+        window: 120 # 回看交易日数量
+        shift: 1 # 向前错位避免未来函数
+      - type: "ma_relation" # 条件类型：均线关系
+        name: "ma60_above_ma250" # 条件名称
+        field: "close" # 均线计算字段
+        op: ">" # 比较符号
+        fast_window: 60 # 快均线窗口
+        slow_window: 250 # 慢均线窗口
+        ma_method: "sma" # 均线算法：sma 或 ema
+  exit: # 出场信号组
+    mode: "any" # 组合方式：any 任一满足
+    conditions: # 出场条件列表
+      - type: "ma_break" # 条件类型：跌破均线
+        name: "close_below_ma60_before_full" # 条件名称
+        apply: "before_pyramid_complete" # 加仓完成前生效
+        field: "close" # 用收盘价比较
+        op: "<" # 比较符号
+        ma_window: 60 # 均线窗口
+        ma_method: "sma" # 均线算法：sma 或 ema
+      - type: "trailing_stop" # 条件类型：移动止损
+        name: "drawdown_15_after_full" # 条件名称
+        apply: "after_pyramid_complete" # 加仓完成后生效
+        drawdown_pct: 0.15 # 持仓高点回撤比例
+
+report: # 报告输出配置
+  output_dir: "outputs/sina_demo" # 报告输出目录
+  risk_free_rate: 0.0 # 指标计算用无风险利率
+  trading_days_per_year: 252 # 年化交易日数量
+  font_candidates: # 中文字体候选
+    - "PingFang SC" # macOS 中文字体
+    - "Arial Unicode MS" # 通用 Unicode 字体
+    - "SimHei" # Windows 黑体

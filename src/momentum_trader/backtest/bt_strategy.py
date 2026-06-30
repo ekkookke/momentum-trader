@@ -11,7 +11,15 @@ def make_etf_pandas_data():
     import backtrader as bt
 
     class ETFPandasData(bt.feeds.PandasData):
-        lines = ("entry_signal", "open_limit_up", "ma_short", "ma_long", "breakout_high")
+        lines = (
+            "entry_signal",
+            "exit_signal_before_pyramid",
+            "exit_signal_after_pyramid",
+            "open_limit_up",
+            "ma_short",
+            "ma_long",
+            "breakout_high",
+        )
         params = (
             ("datetime", None),
             ("open", "open"),
@@ -21,6 +29,8 @@ def make_etf_pandas_data():
             ("volume", "volume"),
             ("openinterest", -1),
             ("entry_signal", "entry_signal"),
+            ("exit_signal_before_pyramid", "exit_signal_before_pyramid"),
+            ("exit_signal_after_pyramid", "exit_signal_after_pyramid"),
             ("open_limit_up", "open_limit_up"),
             ("ma_short", "ma_short"),
             ("ma_long", "ma_long"),
@@ -58,7 +68,7 @@ def make_momentum_strategy():
                     continue
                 self._maybe_exit(data)
 
-            entry_slots = self.config.backtest.max_positions - self._open_position_count()
+            entry_slots = self.config.position.max_positions - self._open_position_count()
             for data in self.datas:
                 if not self._can_trade_current_bar(data):
                     continue
@@ -103,20 +113,52 @@ def make_momentum_strategy():
 
             state = self.position_states[data]
             prev_close = float(data.close[-1])
-            prev_ma_short = float(data.ma_short[-1])
             reason = None
 
-            if not is_pyramid_complete(self.config.strategy, state.pyramid_level):
-                if prev_close < prev_ma_short:
-                    reason = "break_ma_short"
-            elif state.peak_price is not None:
-                stop_price = state.peak_price * (1 - self.config.strategy.trailing_stop_pct)
-                if prev_close <= stop_price:
-                    reason = "trailing_stop"
+            pyramid_complete = is_pyramid_complete(
+                self.config.position.pyramid,
+                state.pyramid_level,
+            )
+            if not pyramid_complete and bool(data.exit_signal_before_pyramid[-1]):
+                reason = "exit_signal_before_pyramid"
+            elif not pyramid_complete:
+                reason = self._dynamic_trailing_stop_reason(
+                    prev_close,
+                    state.peak_price,
+                    "before_pyramid_complete",
+                )
+            elif pyramid_complete and bool(data.exit_signal_after_pyramid[-1]):
+                reason = "exit_signal_after_pyramid"
+            elif pyramid_complete:
+                reason = self._dynamic_trailing_stop_reason(
+                    prev_close,
+                    state.peak_price,
+                    "after_pyramid_complete",
+                )
 
             if reason:
                 order = self.sell(data=data, size=abs(position.size))
                 order.addinfo(reason=reason)
+
+        def _dynamic_trailing_stop_reason(
+            self,
+            prev_close: float,
+            peak_price: float | None,
+            apply_scope: str,
+        ) -> str | None:
+            if peak_price is None:
+                return None
+            for condition in self.config.strategy.exit.conditions:
+                if condition.type != "trailing_stop":
+                    continue
+                if condition.apply not in {"always", apply_scope}:
+                    continue
+                if condition.drawdown_pct is None:
+                    continue
+                stop_price = peak_price * (1 - condition.drawdown_pct)
+                if prev_close <= stop_price:
+                    return condition.name or "trailing_stop"
+            return None
 
         def _maybe_enter_or_add(self, data, entry_slots: int) -> bool:
             position = self.getposition(data)
@@ -133,7 +175,7 @@ def make_momentum_strategy():
                     return False
                 return self._buy_pyramid_step(data, "entry")
 
-            step = next_pyramid_step(self.config.strategy, state.pyramid_level)
+            step = next_pyramid_step(self.config.position.pyramid, state.pyramid_level)
             if step is None or state.entry_price is None:
                 return False
 
@@ -144,7 +186,7 @@ def make_momentum_strategy():
 
         def _buy_pyramid_step(self, data, reason: str) -> bool:
             state = self.position_states[data]
-            step = next_pyramid_step(self.config.strategy, state.pyramid_level)
+            step = next_pyramid_step(self.config.position.pyramid, state.pyramid_level)
             if step is None:
                 return False
 
@@ -152,7 +194,7 @@ def make_momentum_strategy():
             if open_price <= 0:
                 return False
 
-            intent_value = self.broker.getvalue() * self.config.backtest.intent_position_pct
+            intent_value = self.broker.getvalue() * self.config.position.intent_position_pct
             order_value = intent_value * step.allocation_pct
             size = floor(order_value / open_price)
             if size <= 0:
