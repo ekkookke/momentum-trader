@@ -1,0 +1,58 @@
+project:
+  name: "A股ETF动量策略"
+
+data:
+  raw_dir: "data/raw"
+  processed_dir: "data/processed"
+  adjust: "qfq"
+  etf_period: "daily"
+  benchmark_symbol: "sh000300"
+  benchmark_name: "沪深300指数"
+  fetch_date_format: "%Y%m%d"
+
+universe:
+  - symbol: "510300"
+    name: "沪深300ETF"
+  - symbol: "510500"
+    name: "中证500ETF"
+  - symbol: "512480"
+    name: "半导体ETF"
+  - symbol: "159992"
+    name: "创新药ETF"
+  - symbol: "515790"
+    name: "光伏ETF"
+  - symbol: "513130"
+    name: "恒生科技ETF"
+
+backtest:
+  start_date: "2015-01-01"
+  end_date: "2024-12-31"
+  initial_cash: 1000000
+  commission_rate: 0.0015
+  max_positions: 2
+  intent_position_pct: 0.30
+  cash_interest_rate: 0.0
+  limit_up_threshold: 0.095
+
+strategy:
+  breakout_window: 120
+  short_ma_window: 60
+  long_ma_window: 250
+  trailing_stop_pct: 0.15
+  pyramid:
+    - trigger_pct: 0.00
+      allocation_pct: 0.50
+    - trigger_pct: 0.10
+      allocation_pct: 0.30
+    - trigger_pct: 0.20
+      allocation_pct: 0.20
+
+report:
+  output_dir: "outputs"
+  risk_free_rate: 0.0
+  trading_days_per_year: 252
+  font_candidates:
+    - "PingFang SC"
+    - "Arial Unicode MS"
+    - "SimHei"
+
