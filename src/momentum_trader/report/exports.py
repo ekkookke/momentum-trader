@@ -6,6 +6,7 @@ import pandas as pd
 
 from momentum_trader.backtest.engine import BacktestResult
 from momentum_trader.config import AppConfig
+from momentum_trader.report.html_report import export_html_report
 from momentum_trader.report.metrics import (
     compute_equity_metrics,
     compute_symbol_pnl,
@@ -37,6 +38,7 @@ def export_report(config: AppConfig, result: BacktestResult) -> dict[str, Path]:
     orders_path = trades_dir / "orders.csv"
     closed_trades_path = trades_dir / "closed_trades.csv"
     chart_path = charts_dir / "equity_vs_hs300.png"
+    html_path = output_dir / "report.html"
 
     metrics.to_csv(metrics_path, index=False)
     symbol_pnl.to_csv(symbol_pnl_path, index=False)
@@ -48,12 +50,20 @@ def export_report(config: AppConfig, result: BacktestResult) -> dict[str, Path]:
         chart_path,
         config.report.font_candidates,
     )
+    export_html_report(
+        config=config,
+        metrics=metrics,
+        symbol_pnl=symbol_pnl,
+        orders=result.orders,
+        closed_trades=result.closed_trades,
+        output_path=html_path,
+    )
 
     return {
+        "html": html_path,
         "metrics": metrics_path,
         "symbol_pnl": symbol_pnl_path,
         "orders": orders_path,
         "closed_trades": closed_trades_path,
         "chart": chart_path,
     }
-

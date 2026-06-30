@@ -14,6 +14,7 @@ from momentum_trader.utils.logging import console
 app = typer.Typer(help="A-share ETF momentum backtest CLI.")
 DEFAULT_CONFIG = Path("configs/default.yaml")
 ConfigOption = Annotated[Path, typer.Option("--config", "-c")]
+PortOption = Annotated[int, typer.Option("--port", "-p")]
 
 
 @app.command("fetch-data")
@@ -74,6 +75,25 @@ def run(config: ConfigOption = DEFAULT_CONFIG) -> None:
     paths = export_report(cfg, result)
     for name, path in paths.items():
         console.print(f"{name}: {path}")
+
+
+@app.command("serve-report")
+def serve_report(
+    config: ConfigOption = DEFAULT_CONFIG,
+    port: PortOption = 8765,
+) -> None:
+    import functools
+    from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+
+    cfg = load_config(config)
+    output_dir = cfg.report.output_dir
+    if not output_dir.exists():
+        raise typer.BadParameter(f"output directory does not exist: {output_dir}")
+
+    handler = functools.partial(SimpleHTTPRequestHandler, directory=str(output_dir))
+    server = ThreadingHTTPServer(("127.0.0.1", port), handler)
+    console.print(f"Serving report at http://127.0.0.1:{port}/report.html")
+    server.serve_forever()
 
 
 if __name__ == "__main__":
