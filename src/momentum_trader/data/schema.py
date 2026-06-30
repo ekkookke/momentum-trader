@@ -4,8 +4,8 @@ from collections.abc import Iterable
 
 import pandas as pd
 
-REQUIRED_COLUMNS = ["date", "open", "high", "low", "close", "volume"]
-STANDARD_COLUMNS = [*REQUIRED_COLUMNS, "amount"]
+REQUIRED_COLUMNS = ["date", "open", "high", "low", "close"]
+STANDARD_COLUMNS = [*REQUIRED_COLUMNS, "volume", "amount"]
 
 AKSHARE_COLUMN_MAP = {
     "日期": "date",
@@ -27,6 +27,8 @@ def normalize_ohlcv(raw: pd.DataFrame) -> pd.DataFrame:
     missing = [column for column in REQUIRED_COLUMNS if column not in df.columns]
     if missing:
         raise ValueError(f"missing required OHLCV columns: {missing}")
+    if "volume" not in df.columns:
+        df["volume"] = 0
     if "amount" not in df.columns:
         df["amount"] = pd.NA
 

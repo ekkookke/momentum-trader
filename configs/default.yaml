@@ -2,7 +2,7 @@ project:
   name: "A股ETF动量策略"
 
 data:
-  source: "eastmoney"
+  source: "tencent"
   raw_dir: "data/raw"
   processed_dir: "data/processed"
   adjust: "qfq"

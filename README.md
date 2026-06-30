@@ -6,7 +6,7 @@
 
 - Python 3.10+
 - 包管理：uv
-- 数据源：AkShare
+- 数据源：AkShare 腾讯前复权接口，保留 EastMoney / 新浪演示配置
 - 回测引擎：backtrader
 - 本地缓存：parquet
 - 可视化：matplotlib，内置中文字体候选配置
@@ -44,7 +44,7 @@ uv sync
 uv run momentum-trader run --config configs/default.yaml
 ```
 
-如果当前网络代理阻断 EastMoney 前复权接口，可以先用新浪日线演示配置验证管线：
+默认配置使用腾讯前复权接口。如果需要验证备用展示流程，也可以用新浪日线演示配置：
 
 ```bash
 uv run momentum-trader run --config configs/sina_demo.yaml
@@ -77,6 +77,12 @@ uv run pytest
 - `trades/orders.csv`：逐笔订单成交明细
 - `trades/closed_trades.csv`：已闭合交易明细
 
+本地查看 HTML 报告：
+
+```bash
+uv run momentum-trader serve-report --config configs/default.yaml --port 8765
+```
+
 ## 当前策略规则
 
 - 标的池：沪深 300 ETF、中证 500 ETF、半导体 ETF、创新药 ETF、光伏 ETF、恒生科技 ETF
@@ -90,7 +96,7 @@ uv run pytest
 ## 回测风险点处理
 
 - 未来函数：信号生成在 `strategy/signals.py` 中统一处理，突破高点使用 `shift(1)`，只引用 T 日以前的高点；均线只使用 T 日及以前收盘价。
-- 复权处理：AkShare ETF 日线拉取使用 `adjust: qfq`，所有信号和成交使用前复权价格。
+- 复权处理：默认使用 AkShare 腾讯日线接口并传入 `adjust: qfq`，所有信号和成交使用前复权价格。
 - 涨跌停：`open_limit_up` 在执行日根据 T+1 开盘价和前收盘价标记；若 T+1 一字涨停，买入和加仓跳过。
 - 停牌处理：不补齐缺失交易日，停牌日不会生成或执行交易。
 - ETF 上市日期：数据从 AkShare 返回的首个有效交易日开始，早于上市日的回测起点自动失效。

@@ -12,7 +12,7 @@ class ProjectConfig(BaseModel):
 
 
 class DataConfig(BaseModel):
-    source: str = "eastmoney"
+    source: str = "tencent"
     raw_dir: Path
     processed_dir: Path
     adjust: str = "qfq"
