@@ -36,12 +36,24 @@ momentum-trader/
 uv sync
 ```
 
+正式复现实验时建议使用锁文件：
+
+```bash
+uv sync --locked --dev
+```
+
 ## 运行
 
 一键拉数据、回测并导出报告：
 
 ```bash
 uv run momentum-trader run --config configs/default.yaml
+```
+
+为一次实验指定标签，产物会归档到 `outputs/runs/{tag}/`，同时刷新 `outputs/report.html`：
+
+```bash
+uv run momentum-trader run --config configs/default.yaml --tag hs300-demo
 ```
 
 默认配置使用腾讯前复权接口。如果需要验证备用展示流程，也可以用新浪日线演示配置：
@@ -70,6 +82,9 @@ uv run pytest
 
 默认输出目录为 `outputs/`，新浪演示配置输出到 `outputs/sina_demo/`：
 
+- `report.html`：最新一次回测的 HTML 报告，适合 localhost 固定预览
+- `runs/{tag}/`：带标签的历史实验归档目录
+- `index.csv`：每次导出报告追加一行实验索引，记录 tag、配置 SHA1、标的和核心指标
 - `charts/equity_vs_hs300.png`：策略累计净值 vs 沪深 300 基准图
 - `reports/equity_curve.csv`：每日账户权益曲线
 - `reports/metrics.csv`：年化收益、夏普、最大回撤、卡玛、胜率等指标
@@ -81,6 +96,12 @@ uv run pytest
 
 ```bash
 uv run momentum-trader serve-report --config configs/default.yaml --port 8765
+```
+
+查看某个归档实验：
+
+```bash
+uv run momentum-trader serve-report --config configs/default.yaml --tag hs300-demo --port 8765
 ```
 
 ## 当前默认策略规则

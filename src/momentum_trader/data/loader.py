@@ -30,7 +30,12 @@ class MarketDataLoader:
         start = self.config.backtest.start_date
         end = self.config.backtest.end_date
         key = self.cache.key(
-            f"{self.config.data.source}_etf", etf.symbol, start, end, self.config.data.adjust
+            f"{self.config.data.source}_etf",
+            etf.symbol,
+            start,
+            end,
+            self.config.data.adjust,
+            source=self.config.data.source,
         )
 
         df = self.cache.read_or_fetch(
@@ -50,7 +55,14 @@ class MarketDataLoader:
         start = self.config.backtest.start_date
         end = self.config.backtest.end_date
         symbol = self.config.data.benchmark_symbol
-        key = self.cache.key(f"{self.config.data.source}_index", symbol, start, end, "none")
+        key = self.cache.key(
+            f"{self.config.data.source}_index",
+            symbol,
+            start,
+            end,
+            "none",
+            source=self.config.data.source,
+        )
         df = self.cache.read_or_fetch(
             key,
             lambda: self.client.fetch_index_daily(
