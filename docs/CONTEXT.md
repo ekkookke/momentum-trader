@@ -81,9 +81,25 @@ _Avoid_: Individual stock, futures contract, leveraged product
 The manually maintained configuration allowlist of ETFs that the project is allowed to scan and backtest. It is not an automatically discovered all-market ETF pool in the initial system.
 _Avoid_: Stock pool, recommendation list, automatic market-wide discovery
 
+**Market Data Source（市场数据源）**:
+A replaceable historical daily-data input that provides local-cacheable OHLCV series for Signal Scan and Backtest. It is judged first by reviewability, explainability, and price-semantics consistency rather than by being the newest or fastest feed; it is not the authoritative market record itself and does not promise real-time or broker-grade precision.
+_Avoid_: Live quote authority, broker data feed, market data vendor contract
+
+**Formal Market Data Source（正式数据源）**:
+The Market Data Source currently trusted for formal Signal Scan and Backtest explanation. It must satisfy the project's price semantics for the instruments being evaluated.
+_Avoid_: Fastest feed, temporary fallback, demo feed
+
+**Fallback Market Data Source（备用数据源）**:
+One of the configured alternative Market Data Sources used when the Formal Market Data Source is unavailable or being cross-checked. A fallback source may only support formal strategy evaluation when it preserves the same required price semantics.
+_Avoid_: Separate truth source, lower-quality formal result, silent substitute
+
 **Market Data Cache（市场数据缓存）**:
 The local market-data layer that feeds Signal Scan and Backtest so repeated local runs can be reviewed against the same stored inputs. It is a system boundary, not a promise that the cache is the original market-data authority.
 _Avoid_: Live quote stream, external data vendor, remote database
+
+**Market Data Snapshot（市场数据快照）**:
+A local market-data input identified by instrument, date range, adjustment, source, and snapshot date. Snapshots from different Market Data Sources are different inputs even when their instrument, date range, and adjustment labels match; a Snapshot exists so a Run can be reviewed against the same stored inputs, not to prove that the data is always the newest possible version.
+_Avoid_: Latest data, mutable cache entry, live data view
 
 **Momentum Strategy（动量策略）**:
 A rule-based approach that treats confirmed upward price movement as evidence to enter or continue holding an ETF.
@@ -100,6 +116,22 @@ _Avoid_: Intraday scan, real-time alert, high-frequency monitor
 **Market Signal（市场信号）**:
 A rule-derived observation that an ETF currently satisfies a condition the strategy cares about; it is a fact about rule matching, not an instruction to trade.
 _Avoid_: Forecast, prediction, recommendation, trading command
+
+**Tradable Daily Bar（可交易日线）**:
+A standardized OHLCV daily record returned by a Market Data Source for an ETF on a date where the project has usable trading data. Missing days are not filled, suspended days are not treated as flat-price days, and dates before an ETF's first available bar are outside that ETF's valid history.
+_Avoid_: Filled trading day, synthetic bar, pre-listing placeholder
+
+**Valid History（有效历史）**:
+The date range in which an ETF has Tradable Daily Bars inside a Market Data Snapshot. A backtest start date before Valid History is not a Data Gap; the ETF simply cannot participate before its first available Tradable Daily Bar.
+_Avoid_: Full backtest range, pre-listing data, synthetic history
+
+**Data Gap（数据缺口）**:
+A missing, duplicate, invalid, or price-semantics-inconsistent part of a Market Data Snapshot that cannot be explained by non-trading days, suspension, or an ETF listing boundary. It is a data-quality concern, not an automatic trading signal.
+_Avoid_: Suspension day, pre-listing period, no signal
+
+**Data Quality Check（数据质量检查）**:
+A review of a Market Data Snapshot that looks for issues that could distort Signal Scan or Backtest interpretation, such as suspicious gaps, duplicate dates, invalid prices, or price-semantics mismatches. It may warn or block strategy evaluation, but it does not create Market Signals.
+_Avoid_: Trading signal, data repair, performance filter
 
 **Entry Signal（入场信号）**:
 A market condition that makes an ETF eligible for opening a long position under the strategy; it is not a guarantee that the user must place an order.
@@ -137,6 +169,14 @@ _Avoid_: Live trading result, promise of future return, parameter mining
 A baseline market curve used as the historical performance hurdle for a strategy Run. The strategy should not lag its Benchmark on historical return; better risk metrics are useful supporting evidence, but they do not excuse clearly weaker return. The user is willing to accept some volatility in exchange for return.
 _Avoid_: Guaranteed future return, absolute profit target, pure low-volatility target
 
+**Benchmark Series（基准序列）**:
+A market reference series used to compare a strategy Run against a broad market baseline. It is not a tradable ETF execution-price series and does not inherit Forward-adjusted Price requirements.
+_Avoid_: Tradable position, buy-and-hold portfolio, adjusted ETF price series
+
+**Baseline Strategy（基准策略）**:
+A simple tradable comparison rule used to judge whether the configured Momentum Strategy is worth doing versus a low-effort ETF alternative, such as buy-and-hold, monthly contribution, or equal-weight holding. It is a comparison strategy, not the user's active Momentum Strategy.
+_Avoid_: Benchmark index, live recommendation, optimized strategy
+
 **Run（运行记录）**:
 One comparable experiment record produced from a specific configuration, data range, and strategy rule set.
 _Avoid_: Memory, temporary output, one-off chart
@@ -162,8 +202,8 @@ The act of the user placing any real trade outside Momentum Trader after reviewi
 _Avoid_: Automated execution, broker integration, algorithmic order placement
 
 **Forward-adjusted Price（前复权价格）**:
-A price series adjusted so historical prices remain comparable after fund distributions and similar events.
-_Avoid_: Raw price, live quote
+A price series adjusted so historical ETF prices remain comparable after fund distributions and similar events. It is the official price meaning for tradable ETF Signal Scan and Backtest in Momentum Trader.
+_Avoid_: Raw price, live quote, demonstration-only price
 
 **Trading Cost（交易成本）**:
 The assumed cost charged on each executed side of a trade.
