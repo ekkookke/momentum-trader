@@ -117,6 +117,70 @@ _Avoid_: Intraday scan, real-time alert, high-frequency monitor
 A rule-derived observation that an ETF currently satisfies a condition the strategy cares about; it is a fact about rule matching, not an instruction to trade.
 _Avoid_: Forecast, prediction, recommendation, trading command
 
+**Signal Condition（信号条件）**:
+A single explainable rule predicate that can be evaluated from market data and derived market indicators, such as a breakout, trend filter, momentum threshold, volume threshold, or field-vs-moving-average comparison. It is a component of strategy logic, not a standalone trading instruction and not a holder-state rule.
+_Avoid_: Trading signal, recommendation, hidden factor
+
+**Signal Condition Definition（信号条件定义）**:
+A reusable definition of one named Signal Condition. Long-term configuration should prefer defining a condition once and referencing it from entry, exit, scan, or report expressions, instead of copying equivalent rule parameters into multiple places with different names.
+_Avoid_: Duplicated rule copy, same calculation with different labels, report-only shadow condition
+
+**Signal Input（信号输入）**:
+The data a Signal Condition is allowed to read for formal evaluation. Valid inputs are standard market fields with clear observation timing, such as OHLCV, amount, turnover, and Benchmark Series values, plus derived indicators computed by the signal layer from those inputs under the configured rule. Tradable ETF price fields used by formal Signal Conditions share the project's Forward-adjusted Price semantics and should not mix raw and adjusted prices inside one Signal Rule Expression. Arbitrary precomputed factor columns are not formal Signal Inputs unless their source, observation time, and lag semantics are explicit.
+_Avoid_: Hidden feature column, unreviewed external factor, future-looking derived data
+
+**Cross-series Signal Input（跨序列信号输入）**:
+A Signal Input that compares one instrument or Benchmark Series with another market series. Cross-series inputs are aligned by Signal Observation Time and should not be forward-filled for formal signal evaluation; if the comparison series is unavailable on the observation date, the affected Signal Condition is Unknown.
+_Avoid_: Filled comparison value, stale benchmark filter, synthetic relative-strength signal
+
+**Signal Condition Name（信号条件名称）**:
+A stable, descriptive label for a Signal Condition's trading intent across Runs. It must be unique across all entry and exit signal conditions within a Strategy Run so reports, CSV columns, and explanations do not merge different rule meanings. It may include parameter hints such as moving-average length, but those hints must not contradict the actual configuration; the mechanical rule expression remains the source of truth for calculation parameters. It should help explain why a condition exists and support report comparison, without replacing the condition's mechanical calculation shape.
+_Avoid_: Random identifier, calculation type, natural-language investment advice
+
+**Unknown Condition Result（未知条件结果）**:
+A Signal Condition outcome meaning the condition cannot be reliably judged from the available data at the Signal Observation Time. Warmup periods, listing boundaries, missing required inputs on an otherwise valid rule, and unresolved data-quality uncertainty are Unknown rather than False. Unknown should not create an Entry Signal or Exit Signal, and it should remain distinguishable from a condition that was evaluated and found false. Unsupported fields, invalid parameters, and violated data contracts are configuration or data errors, not Unknown results.
+_Avoid_: False condition, no-signal proof, silent data sufficiency assumption
+
+**Signal Rule Expression（信号规则表达式）**:
+A transparent market-data expression that combines Signal Conditions and can produce an Entry Signal or Exit Signal. It may combine conditions with nested positive AND/OR logic, but it should not rely on NOT-style negation because the project favors explainable rules about what is present, not ambiguous rules about what is absent. Formal evaluation should preserve an explanation for each child condition where practical; if a condition is not evaluated because of short-circuiting, that must be reported as not evaluated rather than False or Unknown.
+_Avoid_: Black-box model, ad hoc filter pile, negated rule maze
+
+**Signal Result Matrix（信号结果矩阵）**:
+A run artifact that records condition-level results by instrument, signal observation date, and Signal Condition Name. It should preserve True, False, Unknown, and any explicit not-evaluated state so a Report Package can explain why trades or Action Candidates did or did not appear. Its date is the signal date, not the next executable or filled trade date.
+_Avoid_: Summary-only signal log, overwritten diagnostic column, untraceable trade trigger
+
+**Signal Diagnostic Value（信号诊断值）**:
+A supporting value used to explain a Signal Condition result, such as a breakout threshold, moving average, rolling return, or comparison-series value. Diagnostic values should be associated with the Signal Condition Name that produced them, rather than stored only in global columns that can be overwritten when multiple similar conditions exist.
+_Avoid_: Global moving-average column, shared breakout threshold column, overwritten explanation value
+
+**Signal Date（信号日期）**:
+The market date whose completed daily bar produced a Market Signal. In the daily after-close workflow, Signal Date is T; any earliest next action belongs to execution metadata, such as T+1 eligibility or actual fill date.
+_Avoid_: Execution date, fill date, shifted signal date
+
+**Directional Signal Comparison（方向性信号比较）**:
+A Signal Condition comparison that expresses positive evidence with ordered operators such as greater-than, greater-than-or-equal, less-than, or less-than-or-equal. Price and indicator conditions should use directional comparisons; not-equal comparisons are treated as NOT-style negation and should not be used for formal signals. Equality is reserved for explicit discrete market states, not routine price or indicator comparisons.
+_Avoid_: Not-equal price rule, absence-as-signal, ambiguous equality trigger
+
+**Signal Applicability Scope（信号适用范围）**:
+The review context in which a Signal Rule Expression result is considered, such as entry review or exit review. Applicability that depends on current holdings, portfolio exposure, Pyramiding state, cooldown, or other strategy state belongs to Strategy Execution Filters rather than Signal Conditions.
+_Avoid_: Hidden filter, arbitrary state machine, holder-state signal condition
+
+**Strategy Execution Filter（策略执行过滤）**:
+A state-aware or universe-aware discipline that combines Market Signal results with current holding, portfolio, staged-entry, cooldown, ranking, capacity, tie-breaking priority, or risk context before an Action Candidate or simulated trade is considered eligible. It is not a Signal Condition because it cannot be evaluated as a standalone market-data predicate for one ETF.
+_Avoid_: Market signal, signal condition, pure indicator rule
+
+**Execution Eligibility（执行资格）**:
+The execution-layer decision about whether a true Market Signal can become a simulated order or user-facing Action Candidate under next-bar conditions such as suspension, missing open price, limit-up open, cash availability, position slots, or portfolio constraints. Execution ineligibility should not rewrite the underlying Signal Result.
+_Avoid_: Signal failure, false entry signal, hidden skipped trade
+
+**Signal Observation Time（信号观察时点）**:
+The point at which a Market Signal is considered known. Momentum Trader's first formal signal language is daily and after-close: signals are known only after the relevant Tradable Daily Bar is complete, so same-day OHLCV can be used for after-close review, but next-day or later data cannot be part of that signal. Using T-day open, high, low, close, volume, amount, or turnover in an after-close signal does not imply the strategy could trade at T-day open; execution timing remains a separate rule. Weekly, monthly, or intraday signals require a separate future design rather than implicit reuse of the daily signal semantics.
+_Avoid_: Intraday foresight, next-day signal knowledge, future-looking signal, implicit multi-timeframe rule
+
+**Breakout Threshold（突破阈值）**:
+The historical price boundary used to decide whether price has broken out. For formal entry logic, the threshold must be formed from completed bars before the bar being evaluated, so the current bar does not help create the level it is trying to break. Current-bar-inclusive breakout calculations may be diagnostic market-state metrics, but they are not formal entry breakout thresholds.
+_Avoid_: Current-bar self-reference, intraday high trigger, fitted threshold, self-created breakout
+
 **Tradable Daily Bar（可交易日线）**:
 A standardized OHLCV daily record returned by a Market Data Source for an ETF on a date where the project has usable trading data. Missing days are not filled, suspended days are not treated as flat-price days, and dates before an ETF's first available bar are outside that ETF's valid history.
 _Avoid_: Filled trading day, synthetic bar, pre-listing placeholder
@@ -134,12 +198,12 @@ A review of a Market Data Snapshot that looks for issues that could distort Sign
 _Avoid_: Trading signal, data repair, performance filter
 
 **Entry Signal（入场信号）**:
-A market condition that makes an ETF eligible for opening a long position under the strategy; it is not a guarantee that the user must place an order.
-_Avoid_: Buy tip, guaranteed buy point, buy order
+A close-confirmed market condition that makes an ETF eligible for opening a long position under the strategy; it is not a guarantee that the user must place an order. High or low prices may help form thresholds or diagnostics, but first-version formal entry triggers should be based on the completed close unless a future design explicitly introduces intrabar-derived signal semantics.
+_Avoid_: Buy tip, guaranteed buy point, buy order, intraday touch trigger
 
 **Exit Signal（出场信号）**:
-A market condition that makes an existing position eligible to be closed under the strategy; it is not an automated sell instruction.
-_Avoid_: Sell tip, panic sell, sell order
+A close-confirmed market condition that indicates the strategy's exit rule matched. It can be evaluated as a market observation even when the ETF is not currently held, but only Strategy Execution Filters can turn it into a sell-side Action Candidate for an existing position. Path-dependent risk exits are handled outside Signal Conditions. It is not an automated sell instruction.
+_Avoid_: Sell tip, panic sell, sell order, sell candidate without a position, intraday touch exit
 
 **Action Candidate（操作候选）**:
 A rule-derived item that deserves user review because the configured strategy implies a possible next action. It should include the triggering rule explanation and relevant risk context, but it is not investment advice.
@@ -158,8 +222,8 @@ A staged increase in exposure after an initial entry as price movement continues
 _Avoid_: Averaging down, martingale, cost averaging
 
 **Drawdown Stop（回撤止损）**:
-A risk-control discipline based on how far price has fallen from the highest price observed during a holding period.
-_Avoid_: Profit target, discretionary stop
+A state-aware risk-control discipline based on how far price has fallen from the highest price observed during a holding period. Because it depends on holding-path state, it belongs to Strategy Execution Filters or risk-exit rules rather than Signal Conditions.
+_Avoid_: Signal condition, profit target, discretionary stop
 
 **Backtest（回测）**:
 A historical simulation used to validate rules, compare Runs, and understand how a fully specified strategy would have behaved over past market data. It is not a mandate to mine parameters until they fit history.
@@ -182,8 +246,8 @@ One comparable experiment record produced from a specific configuration, data ra
 _Avoid_: Memory, temporary output, one-off chart
 
 **Report Package（报告包）**:
-The local, reviewable output of a Run, including the HTML report, charts, metric summary, trade details, and configuration snapshot needed to understand the result. A localhost URL is only a viewing method for this local package, not a cloud service.
-_Avoid_: Cloud dashboard, hosted report, screenshot-only result
+The local, reviewable output of a Run, including the HTML report, charts, metric summary, trade details, signal-present rows with condition-level explanations, and configuration snapshot needed to understand the result. Default report views should focus on dates and instruments where Entry Signals, Exit Signals, Action Candidates, skipped executions, or material Unknown results appeared; false-only history should not be shown as a long daily table. A localhost URL is only a viewing method for this local package, not a cloud service.
+_Avoid_: Cloud dashboard, hosted report, screenshot-only result, false-only noise wall
 
 **Run Tag（运行标签）**:
 A human-readable label used to identify a Run and compare it with other Runs.
