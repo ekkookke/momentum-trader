@@ -173,6 +173,30 @@ _Avoid_: Market signal, signal condition, pure indicator rule
 The execution-layer decision about whether a true Market Signal can become a simulated order or user-facing Action Candidate under next-bar conditions such as suspension, missing open price, limit-up open, cash availability, position slots, or portfolio constraints. Execution ineligibility should not rewrite the underlying Signal Result.
 _Avoid_: Signal failure, false entry signal, hidden skipped trade
 
+**Execution Barrier（执行障碍）**:
+An execution-layer condition that prevents a Market Signal from becoming a Backtest Fill or Action Candidate even though the underlying signal remains valid. For ETF momentum trading, one-price limit-up opens are treated as rare protective guards rather than a central strategy assumption; more common barriers include missing tradable data, unavailable open price, cash limits, and position-slot limits.
+_Avoid_: Signal failure, strategy alpha, price prediction
+
+**Next Eligible Open（下一可执行开盘）**:
+The open price of the next Tradable Daily Bar after the Signal Date that passes Execution Eligibility for the intended action. In ordinary continuous trading this is often described as T+1 open, but the formal meaning does not require synthesizing a missing or suspended day.
+_Avoid_: Calendar T+1, same-day open, synthetic open
+
+**Multi-instrument Execution（多标的执行）**:
+The execution-layer discipline for deciding which same-Signal-Date Entry Signals become Backtest Fills or Action Candidates when portfolio capacity is limited. It ranks already-valid signals and records skipped candidates; it does not create, suppress, or rewrite Market Signals.
+_Avoid_: Signal condition, recommendation ranking, silent candidate drop
+
+**Position Slot（持仓槽位）**:
+A portfolio-capacity unit that limits how many ETFs a Strategy Run may hold at the same time. Slot limits are Strategy Execution Filters and do not change the underlying Entry Signal result.
+_Avoid_: Signal limit, broker account slot, universe size
+
+**Breakout Momentum Score（突破动能分）**:
+A selection score used to rank same-Signal-Date Entry Signals competing for limited Position Slots. It measures breakout strength normalized by recent volatility from Signal Date data; a higher score has higher execution priority.
+_Avoid_: Parameter-mined alpha score, next-day execution score, discretionary favorite
+
+**Skipped Backtest Fill（跳过回测成交）**:
+A backtest record showing that a Market Signal or Action Candidate did not become a Backtest Fill because Execution Eligibility or Position Slot rules blocked it. It should preserve the symbol, relevant selection score when available, and skip reason for auditability.
+_Avoid_: Silent drop, false signal, missing order
+
 **Signal Observation Time（信号观察时点）**:
 The point at which a Market Signal is considered known. Momentum Trader's first formal signal language is daily and after-close: signals are known only after the relevant Tradable Daily Bar is complete, so same-day OHLCV can be used for after-close review, but next-day or later data cannot be part of that signal. Using T-day open, high, low, close, volume, amount, or turnover in an after-close signal does not imply the strategy could trade at T-day open; execution timing remains a separate rule. Weekly, monthly, or intraday signals require a separate future design rather than implicit reuse of the daily signal semantics.
 _Avoid_: Intraday foresight, next-day signal knowledge, future-looking signal, implicit multi-timeframe rule
@@ -228,6 +252,10 @@ _Avoid_: Signal condition, profit target, discretionary stop
 **Backtest（回测）**:
 A historical simulation used to validate rules, compare Runs, and understand how a fully specified strategy would have behaved over past market data. It is not a mandate to mine parameters until they fit history.
 _Avoid_: Live trading result, promise of future return, parameter mining
+
+**Backtest Fill（回测成交）**:
+A simulated historical fill used inside Backtest when an action passes Execution Eligibility. In the daily after-close model, it uses the Next Eligible Open; it is not Manual Execution or a broker-confirmed real trade.
+_Avoid_: Manual execution, real broker fill, signal date
 
 **Benchmark（基准）**:
 A baseline market curve used as the historical performance hurdle for a strategy Run. The strategy should not lag its Benchmark on historical return; better risk metrics are useful supporting evidence, but they do not excuse clearly weaker return. The user is willing to accept some volatility in exchange for return.

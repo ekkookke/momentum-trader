@@ -93,6 +93,6 @@ Open question: should formal entry and exit conditions reject non-`close` trigge
 
 ## Candidate Priority Semantics
 
-ADR-0007 keeps same-day tie-breaking among multiple true Entry Signals outside the signal layer. The current backtest uses configuration order when multiple ETFs compete for limited position slots.
+Resolved by ADR-0009: same-day Entry Signals competing for limited Position Slots use Breakout Momentum Score, with higher score receiving execution priority. ETF Universe configuration order remains useful only as a deterministic fallback for exact ties or explicitly documented unknown-score handling.
 
-Open question: should Strategy Execution continue using configuration order, switch to an explicit priority field, or support ranking-based candidate selection while preserving stable Run explanations?
+Remaining implementation detail: unknown or invalid score inputs should be reported explicitly rather than silently treated as strong candidates.
