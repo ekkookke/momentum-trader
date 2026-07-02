@@ -297,6 +297,22 @@ _Avoid_: Automated execution, broker integration, algorithmic order placement
 A price series adjusted so historical ETF prices remain comparable after fund distributions and similar events. It is the official price meaning for tradable ETF Signal Scan and Backtest in Momentum Trader.
 _Avoid_: Raw price, live quote, demonstration-only price
 
-**Trading Cost（交易成本）**:
-The assumed cost charged on each executed side of a trade.
-_Avoid_: Tax model, broker statement
+**Backtest Trading Cost（回测交易成本）**:
+The modeled execution friction attached to each Backtest Fill. In Momentum Trader's ETF scope, it is decomposed into Commission, Minimum Commission, Slippage, and explicit zero Stamp Tax for reporting; it is not a live broker statement.
+_Avoid_: Live trading fee, broker statement, all-in stock-style cost
+
+**Commission（佣金）**:
+The broker-fee component of Backtest Trading Cost, calculated separately from Slippage and tax. It may be subject to a Minimum Commission on each Backtest Fill.
+_Avoid_: Slippage, stamp tax, all-in fee
+
+**Minimum Commission（最低佣金）**:
+A per-order floor on the Commission component of Backtest Trading Cost. Small fills can have a higher effective cost rate because this floor applies to each order, not to the whole Run.
+_Avoid_: Minimum total cost, account fee, fixed tax
+
+**Slippage（滑点）**:
+The modeled execution-friction component for price impact and fill uncertainty around the Backtest Fill price. It is a backtest assumption, not a broker-charged fee.
+_Avoid_: Commission, tax, actual spread proof
+
+**Stamp Tax（印花税）**:
+A tax component kept explicit in Backtest Trading Cost. For the current exchange-traded ETF scope, it is configured as zero.
+_Avoid_: ETF commission, transfer fee, hidden cost
